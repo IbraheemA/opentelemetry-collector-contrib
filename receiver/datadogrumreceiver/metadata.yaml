@@ -1,0 +1,13 @@
+type: datadogrum
+
+status:
+  class: receiver
+  stability:
+    alpha: [traces]
+    development: [metrics]
+  distributions: [contrib]
+  codeowners:
+    active: [IbraheemA]
+
+tests:
+  skip_lifecycle: true # Skip lifecycle tests since there are multiple receivers that run on the same port

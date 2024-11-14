@@ -1,0 +1,71 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+  datadogrum:
+
+processors:
+  filter/keep_zero_trace_id:
+    traces:
+      span:
+        - 'trace_id != TraceID(0x00000000000000000000000000000000)'
+
+  filter/drop_zero_trace_id:
+    traces:
+      span:
+        - 'trace_id == TraceID(0x00000000000000000000000000000000)'
+  tail_sampling/keep_zero_trace_id:
+    decision_wait: 10s
+    num_traces: 100
+    expected_new_traces_per_sec: 10
+    policies:
+      [
+        {
+          name: min-threshold-test,
+          type: status_code,
+          status_code: { status_codes: [ ERROR ] },
+        } ]
+
+  tail_sampling/drop_zero_trace_id:
+    decision_wait: 10s
+    num_traces: 100
+    expected_new_traces_per_sec: 10
+    policies:
+      [
+        {
+          name: min-threshold-test,
+          type: status_code,
+          status_code: { status_codes: [ ERROR ] },
+        } ]
+  batch:
+
+exporters:
+  # NOTE: Prior to v0.86.0 use `logging` instead of `debug`.
+  debug:
+    verbosity: detailed
+  datadogrum:
+#    api:
+#      site: ${env:DD_SITE}
+
+service:
+  pipelines:
+#    traces/rum_non_zero_trace_id:
+#      receivers: [ datadogrum ]
+#      processors: [ filter/non_zero_trace_id, tail_sampling/non_zero_trace_id ]
+#      exporters: [ datadogrum ]
+
+    traces/rum_zero_trace_id:
+      receivers: [ datadogrum ]
+#      processors: [ filter/zero_trace_id, tail_sampling/zero_trace_id ]
+#      exporters: [ datadogrum ]
+      processors: [ filter/keep_zero_trace_id ]
+      exporters: [ debug ]
+#      exporters: [ datadogrum ]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+  telemetry:
+    logs:
+      level: debug

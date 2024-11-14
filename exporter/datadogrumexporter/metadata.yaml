@@ -1,0 +1,9 @@
+type: datadogrum
+
+status:
+  class: exporter
+  stability:
+    development: [traces]
+  distributions: [contrib]
+  codeowners:
+    active: [IbraheemA]
