@@ -59,26 +59,6 @@ func (ddr *datadogRUMReceiver) Start(ctx context.Context, host component.Host) e
 		ddmux.HandleFunc("/api/v2/rum", ddr.handleEvent)
 	}
 
-	//if ddr.nextTracesConsumer != nil {
-	//	ddmux.HandleFunc("/v0.3/traces", ddr.handleTraces)
-	//	ddmux.HandleFunc("/v0.4/traces", ddr.handleTraces)
-	//	ddmux.HandleFunc("/v0.5/traces", ddr.handleTraces)
-	//	ddmux.HandleFunc("/v0.7/traces", ddr.handleTraces)
-	//	ddmux.HandleFunc("/api/v0.2/traces", ddr.handleTraces)
-	//}
-	//
-	//if ddr.nextMetricsConsumer != nil {
-	//	ddr.metricsTranslator = translator.NewMetricsTranslator(ddr.params.BuildInfo)
-	//
-	//	ddmux.HandleFunc("/api/v1/series", ddr.handleV1Series)
-	//	ddmux.HandleFunc("/api/v2/series", ddr.handleV2Series)
-	//	ddmux.HandleFunc("/api/v1/check_run", ddr.handleCheckRun)
-	//	ddmux.HandleFunc("/api/v1/sketches", ddr.handleSketches)
-	//	ddmux.HandleFunc("/api/beta/sketches", ddr.handleSketches)
-	//	ddmux.HandleFunc("/intake", ddr.handleIntake)
-	//	ddmux.HandleFunc("/api/v1/distribution_points", ddr.handleDistributionPoints)
-	//}
-
 	var err error
 	ddr.server, err = ddr.config.ServerConfig.ToServer(
 		ctx,
@@ -151,8 +131,18 @@ func (ddr *datadogRUMReceiver) handleEvent(w http.ResponseWriter, req *http.Requ
 	io.Copy(buf, req.Body)
 	reqBytes := buf.Bytes()
 
+	//printBuf := GetBuffer()
+	//defer PutBuffer(buf)
+	//io.Copy(printBuf, req.MultipartReader())
+	//printBytes := printBuf.Bytes()
+
+	traceID := req.Header.Get("X-Datadog-Trace-Id")
+	//spanID := req.Header.Get("X-Datadog-Span-Id")
+
 	// check errors
-	ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED REQUEST: " + fmt.Sprintf("%v", buf.String()))
+	ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED REQUEST BODY: " + fmt.Sprintf("%v", buf.String()))
+	ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED TraceID: " + fmt.Sprintf("%v", traceID))
+	//ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED SpanID: " + fmt.Sprintf("%v", spanID))
 
 	//postfixBytes := []byte(`{"kind": "receiver", "name": "datadogrum", "data_type": "logs"}`) // Convert the postfix string to a byte slice
 	//if bytes.HasSuffix(reqBytes, postfixBytes) {

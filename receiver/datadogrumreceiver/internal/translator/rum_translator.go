@@ -8,11 +8,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"io"
 	"math/rand"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -59,31 +61,68 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 	formattedPayload, _ := json.MarshalIndent(payload, "", "\t")
 	rs.Resource().Attributes().PutStr("pretty_payload", string(formattedPayload))
 	rand.Seed(time.Now().UnixNano())
+	fmt.Println("pretty_payload:")
+	fmt.Println(string(formattedPayload))
 
-	emptyDumpBytes := rs.Resource().Attributes().PutEmptyBytes("payload_dump")
-	emptyDumpBytes.FromRaw(reqBytes)
+	//emptyDumpBytes := rs.Resource().Attributes().PutEmptyBytes("payload_dump")
+	//emptyDumpBytes.FromRaw(reqBytes)
 
 	in := rs.ScopeSpans().AppendEmpty()
 	in.Scope().SetName("Datadog")
+	//var metadata map[string]any
+	//var ok bool
+	//if metadata, ok = payload["_dd"].(map[string]any); !ok {
+	//	fmt.Println("failed to parse metadata")
+	//	return results
+	//}
+	//traceID := uint64(metadata["trace_id"].(float64))
+	traceIDString := req.Header.Get("X-Datadog-Trace-Id")
+	traceID, err := strconv.Atoi(traceIDString)
+	if err != nil {
+		fmt.Println("failed to parse traceID")
+		return results
+	}
+	//spanID := uint64(metadata["span_id"].(float64))
+	//spanID := uint64(1)
+	spanIDString := req.Header.Get("X-Datadog-Parent-Id")
+	spanID, err := strconv.Atoi(spanIDString)
+	if err != nil {
+		fmt.Println("failed to parse parent ID")
+		return results
+	}
+
+	//traceIDString := metadata["trace_id"].(string)
+	//spanIDString := metadata["span_id"].(string)
+	//var spanID, traceID uint64
+	//if t, err := strconv.Atoi(traceIDString); err != nil {
+	//	fmt.Println("found trace_id:")
+	//	fmt.Println(t)
+	//	traceID = 0
+	//	return results
+	//} else {
+	//	traceID = uint64(t)
+	//}
+	//
+	//if t, err := strconv.Atoi(spanIDString); err != nil {
+	//	fmt.Println("found span_id:")
+	//	fmt.Println(t)
+	//	spanID = 0
+	//	return results
+	//} else {
+	//	spanID = uint64(t)
+	//}
+	fmt.Println("b1")
 	newSpan := in.Spans().AppendEmpty()
 	if rand.Intn(2) == 0 {
 		newSpan.Status().SetCode(ptrace.StatusCodeError)
 	} else {
 		newSpan.Status().SetCode(ptrace.StatusCodeOk)
 	}
-	metadata := payload["_dd"].(map[string]any)
-	if traceID, ok := metadata["trace_id"].(uint64); ok {
-		newSpan.SetTraceID(uInt64ToTraceID(0, traceID))
-	} else {
-		newSpan.SetTraceID(uInt64ToTraceID(0, 0))
-	}
-	if spanID, ok := metadata["span_id"].(uint64); ok {
+	//newSpan.SetTraceID(uInt64ToTraceID(uint64(traceID), uint64(traceID)))
+	newSpan.SetTraceID(uInt64ToTraceID(0, uint64(traceID)))
+	newSpan.SetSpanID(uInt64ToSpanID(uint64(spanID)))
 
-		newSpan.SetSpanID(uInt64ToSpanID(spanID))
-	} else {
-		newSpan.SetSpanID(uInt64ToSpanID(0))
-	}
-
+	fmt.Println("%%%%% successful parse!")
 	return results
 }
 
