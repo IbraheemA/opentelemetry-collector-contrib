@@ -60,6 +60,7 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 	rs.SetSchemaUrl(semconv.SchemaURL)
 	formattedPayload, _ := json.MarshalIndent(payload, "", "\t")
 	rs.Resource().Attributes().PutStr("pretty_payload", string(formattedPayload))
+	rs.Resource().Attributes().PutStr(semconv.AttributeServiceName, "browser-rum-sdk")
 	rand.Seed(time.Now().UnixNano())
 	fmt.Println("pretty_payload:")
 	fmt.Println(string(formattedPayload))
@@ -76,7 +77,8 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 	//	return results
 	//}
 	//traceID := uint64(metadata["trace_id"].(float64))
-	traceIDString := req.Header.Get("X-Datadog-Trace-Id")
+	//traceIDString := req.Header.Get("X-Datadog-Trace-Id")
+	traceIDString := payload["_dd"].(map[string]any)["trace_id"].(string)
 	traceID, err := strconv.Atoi(traceIDString)
 	if err != nil {
 		fmt.Println("failed to parse traceID")
@@ -84,7 +86,8 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 	}
 	//spanID := uint64(metadata["span_id"].(float64))
 	//spanID := uint64(1)
-	spanIDString := req.Header.Get("X-Datadog-Parent-Id")
+	//spanIDString := req.Header.Get("X-Datadog-Parent-Id")
+	spanIDString := payload["_dd"].(map[string]any)["span_id"].(string)
 	spanID, err := strconv.Atoi(spanIDString)
 	if err != nil {
 		fmt.Println("failed to parse parent ID")

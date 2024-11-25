@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/datadogrumreceiver/internal/translator"
+	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -60,11 +61,18 @@ func (ddr *datadogRUMReceiver) Start(ctx context.Context, host component.Host) e
 	}
 
 	var err error
+	corsHandler := cors.New(cors.Options{
+		AllowedOrigins:   []string{"https://localhost:*", "http://localhost:*"}, // Specify allowed origins
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},                    // Specify allowed methods
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},             // Specify allowed headers
+		AllowCredentials: true,                                                  // Allow credentials
+	}).Handler(ddmux)
+
 	ddr.server, err = ddr.config.ServerConfig.ToServer(
 		ctx,
 		host,
 		ddr.params.TelemetrySettings,
-		ddmux,
+		corsHandler,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create server definition: %w", err)
