@@ -4,69 +4,41 @@
 package translator // import "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/datadogreceiver/internal/translator"
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	"io"
 	"math/rand"
-	"mime"
 	"net/http"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 
-	pb "github.com/DataDog/datadog-agent/pkg/proto/pbgo/trace"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	semconv "go.opentelemetry.io/collector/semconv/v1.16.0"
-	"google.golang.org/protobuf/proto"
 )
 
-const (
-	datadogSpanKindKey = "span.kind"
-	// The datadog trace id
-	//
-	// Type: string
-	// Requirement Level: Optional
-	// Examples: '6249785623524942554'
-	attributeDatadogTraceID = "datadog.trace.id"
-	// The datadog span id
-	//
-	// Type: string
-	// Requirement Level: Optional
-	// Examples: '228114450199004348'
-	attributeDatadogSpanID = "datadog.span.id"
-)
+func ToLogs(payload map[string]any, req *http.Request, reqBytes []byte) plog.Logs {
+	results := plog.NewLogs()
+	rl := results.ResourceLogs().AppendEmpty()
+	rl.SetSchemaUrl(semconv.SchemaURL)
+	ParseRUMRequestIntoResource(rl.Resource(), payload, req, reqBytes)
 
-func upsertHeadersAttributes(req *http.Request, attrs pcommon.Map) {
-	if ddTracerVersion := req.Header.Get("Datadog-Meta-Tracer-Version"); ddTracerVersion != "" {
-		attrs.PutStr(semconv.AttributeTelemetrySDKVersion, "Datadog-"+ddTracerVersion)
-	}
-	if ddTracerLang := req.Header.Get("Datadog-Meta-Lang"); ddTracerLang != "" {
-		otelLang := ddTracerLang
-		if ddTracerLang == ".NET" {
-			otelLang = "dotnet"
-		}
-		attrs.PutStr(semconv.AttributeTelemetrySDKLanguage, otelLang)
-	}
+	in := rl.ScopeLogs().AppendEmpty()
+	in.Scope().SetName("Datadog")
+
+	newLogRecord := in.LogRecords().AppendEmpty()
+	newLogRecord.Attributes().PutBool("should_tail_sample", rand.Intn(2) == 1)
+
+	fmt.Println("%%%%% successful log parse!")
+	return results
 }
 
 func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace.Traces {
 	results := ptrace.NewTraces()
 	rs := results.ResourceSpans().AppendEmpty()
 	rs.SetSchemaUrl(semconv.SchemaURL)
-	formattedPayload, _ := json.MarshalIndent(payload, "", "\t")
-	rs.Resource().Attributes().PutStr("pretty_payload", string(formattedPayload))
-	rs.Resource().Attributes().PutStr(semconv.AttributeServiceName, "browser-rum-sdk")
-	rand.Seed(time.Now().UnixNano())
-	fmt.Println("pretty_payload:")
-	fmt.Println(string(formattedPayload))
-
-	//emptyDumpBytes := rs.Resource().Attributes().PutEmptyBytes("payload_dump")
-	//emptyDumpBytes.FromRaw(reqBytes)
+	ParseRUMRequestIntoResource(rs.Resource(), payload, req, reqBytes)
 
 	in := rs.ScopeSpans().AppendEmpty()
 	in.Scope().SetName("Datadog")
@@ -78,7 +50,12 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 	//}
 	//traceID := uint64(metadata["trace_id"].(float64))
 	//traceIDString := req.Header.Get("X-Datadog-Trace-Id")
-	traceIDString := payload["_dd"].(map[string]any)["trace_id"].(string)
+	//traceIDString := payload["_dd"].(map[string]any)["trace_id"].(string)
+	traceIDString, ok := payload["_dd"].(map[string]any)["trace_id"].(string)
+	if !ok {
+		fmt.Println("failed to retrieve traceID from payload")
+		return results
+	}
 	traceID, err := strconv.Atoi(traceIDString)
 	if err != nil {
 		fmt.Println("failed to parse traceID")
@@ -124,198 +101,40 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 	//newSpan.SetTraceID(uInt64ToTraceID(uint64(traceID), uint64(traceID)))
 	newSpan.SetTraceID(uInt64ToTraceID(0, uint64(traceID)))
 	newSpan.SetSpanID(uInt64ToSpanID(uint64(spanID)))
+	newSpan.Attributes().PutBool("should_tail_sample", rand.Intn(2) == 1)
 
-	fmt.Println("%%%%% successful parse!")
+	fmt.Println("%%%%% successful trace parse!")
 	return results
 }
 
-var bufferPool = sync.Pool{
-	New: func() any {
-		return new(bytes.Buffer)
-	},
-}
+func ParseRUMRequestIntoResource(res pcommon.Resource, payload map[string]any, req *http.Request, reqBytes []byte) {
+	formattedPayload, _ := json.MarshalIndent(payload, "", "\t")
+	res.Attributes().PutStr("pretty_payload", string(formattedPayload))
+	res.Attributes().PutStr(semconv.AttributeServiceName, "browser-rum-sdk")
+	rand.Seed(time.Now().UnixNano())
+	//fmt.Println("pretty_payload:")
+	//fmt.Println(string(formattedPayload))
 
-func GetBuffer() *bytes.Buffer {
-	buffer := bufferPool.Get().(*bytes.Buffer)
-	buffer.Reset()
-	return buffer
-}
+	emptyDumpBytes := res.Attributes().PutEmptyBytes("request_body_dump")
+	emptyDumpBytes.FromRaw(reqBytes)
 
-func PutBuffer(buffer *bytes.Buffer) {
-	bufferPool.Put(buffer)
-}
-
-func HandleTracesPayload(req *http.Request) (tp []*pb.TracerPayload, err error) {
-	var tracerPayloads []*pb.TracerPayload
-
-	defer func() {
-		_, errs := io.Copy(io.Discard, req.Body)
-		err = errors.Join(err, errs, req.Body.Close())
-	}()
-
-	switch {
-	case strings.HasPrefix(req.URL.Path, "/v0.7"):
-		buf := GetBuffer()
-		defer PutBuffer(buf)
-		if _, err = io.Copy(buf, req.Body); err != nil {
-			return nil, err
-		}
-		var tracerPayload pb.TracerPayload
-		if _, err = tracerPayload.UnmarshalMsg(buf.Bytes()); err != nil {
-			return nil, err
-		}
-
-		tracerPayloads = append(tracerPayloads, &tracerPayload)
-	case strings.HasPrefix(req.URL.Path, "/v0.5"):
-		buf := GetBuffer()
-		defer PutBuffer(buf)
-		if _, err = io.Copy(buf, req.Body); err != nil {
-			return nil, err
-		}
-		var traces pb.Traces
-
-		if err = traces.UnmarshalMsgDictionary(buf.Bytes()); err != nil {
-			return nil, err
-		}
-
-		traceChunks := traceChunksFromTraces(traces)
-		appVersion := appVersionFromTraceChunks(traceChunks)
-
-		tracerPayload := &pb.TracerPayload{
-			LanguageName:    req.Header.Get("Datadog-Meta-Lang"),
-			LanguageVersion: req.Header.Get("Datadog-Meta-Lang-Version"),
-			TracerVersion:   req.Header.Get("Datadog-Meta-Tracer-Version"),
-			Chunks:          traceChunks,
-			AppVersion:      appVersion,
-		}
-		tracerPayloads = append(tracerPayloads, tracerPayload)
-
-	case strings.HasPrefix(req.URL.Path, "/v0.1"):
-		var spans []pb.Span
-		if err = json.NewDecoder(req.Body).Decode(&spans); err != nil {
-			return nil, err
-		}
-		tracerPayload := &pb.TracerPayload{
-			LanguageName:    req.Header.Get("Datadog-Meta-Lang"),
-			LanguageVersion: req.Header.Get("Datadog-Meta-Lang-Version"),
-			TracerVersion:   req.Header.Get("Datadog-Meta-Tracer-Version"),
-			Chunks:          traceChunksFromSpans(spans),
-		}
-		tracerPayloads = append(tracerPayloads, tracerPayload)
-	case strings.HasPrefix(req.URL.Path, "/api/v0.2"):
-		buf := GetBuffer()
-		defer PutBuffer(buf)
-		if _, err = io.Copy(buf, req.Body); err != nil {
-			return nil, err
-		}
-
-		var agentPayload pb.AgentPayload
-		if err = proto.Unmarshal(buf.Bytes(), &agentPayload); err != nil {
-			return nil, err
-		}
-
-		return agentPayload.TracerPayloads, err
-
-	default:
-		var traces pb.Traces
-		if err = decodeRequest(req, &traces); err != nil {
-			return nil, err
-		}
-		traceChunks := traceChunksFromTraces(traces)
-		appVersion := appVersionFromTraceChunks(traceChunks)
-		tracerPayload := &pb.TracerPayload{
-			LanguageName:    req.Header.Get("Datadog-Meta-Lang"),
-			LanguageVersion: req.Header.Get("Datadog-Meta-Lang-Version"),
-			TracerVersion:   req.Header.Get("Datadog-Meta-Tracer-Version"),
-			Chunks:          traceChunks,
-			AppVersion:      appVersion,
-		}
-		tracerPayloads = append(tracerPayloads, tracerPayload)
-	}
-
-	return tracerPayloads, nil
-}
-
-func decodeRequest(req *http.Request, dest *pb.Traces) (err error) {
-	switch mediaType := getMediaType(req); mediaType {
-	case "application/msgpack":
-		buf := GetBuffer()
-		defer PutBuffer(buf)
-		_, err = io.Copy(buf, req.Body)
-		if err != nil {
-			return err
-		}
-		_, err = dest.UnmarshalMsg(buf.Bytes())
-		return err
-	case "application/json":
-		fallthrough
-	case "text/json":
-		fallthrough
-	case "":
-		err = json.NewDecoder(req.Body).Decode(&dest)
-		return err
-	default:
-		// do our best
-		if err1 := json.NewDecoder(req.Body).Decode(&dest); err1 != nil {
-			buf := GetBuffer()
-			defer PutBuffer(buf)
-			_, err2 := io.Copy(buf, req.Body)
-			if err2 != nil {
-				return err2
-			}
-			_, err2 = dest.UnmarshalMsg(buf.Bytes())
-			return err2
-		}
-		return nil
-	}
-}
-
-func traceChunksFromSpans(spans []pb.Span) []*pb.TraceChunk {
-	traceChunks := []*pb.TraceChunk{}
-	byID := make(map[uint64][]*pb.Span)
-	for i := range spans {
-		byID[spans[i].TraceID] = append(byID[spans[i].TraceID], &spans[i])
-	}
-	for _, t := range byID {
-		traceChunks = append(traceChunks, &pb.TraceChunk{
-			Priority: int32(0),
-			Spans:    t,
-		})
-	}
-	return traceChunks
-}
-
-func traceChunksFromTraces(traces pb.Traces) []*pb.TraceChunk {
-	traceChunks := make([]*pb.TraceChunk, 0, len(traces))
-	for _, trace := range traces {
-		traceChunks = append(traceChunks, &pb.TraceChunk{
-			Priority: int32(0),
-			Spans:    trace,
-		})
-	}
-
-	return traceChunks
-}
-
-func appVersionFromTraceChunks(traces []*pb.TraceChunk) string {
-	appVersion := ""
-	for _, trace := range traces {
-		for _, span := range trace.Spans {
-			if span != nil && span.Meta["version"] != "" {
-				appVersion = span.Meta["version"]
-				return appVersion
-			}
+	requestHeadersMap := res.Attributes().PutEmptyMap("request_headers")
+	for key, values := range req.Header {
+		valueSlice := requestHeadersMap.PutEmptySlice(key)
+		for _, value := range values {
+			valueSlice.AppendEmpty().SetStr(value)
 		}
 	}
-	return appVersion
-}
 
-func getMediaType(req *http.Request) string {
-	mt, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
-	if err != nil {
-		return "application/json"
+	requestQueryMap := res.Attributes().PutEmptyMap("request_query")
+	for key, values := range req.URL.Query() {
+		valueSlice := requestQueryMap.PutEmptySlice(key)
+		for _, value := range values {
+			valueSlice.AppendEmpty().SetStr(value)
+		}
 	}
-	return mt
+
+	res.Attributes().PutStr("request_ddforward", req.URL.Query().Get("ddforward"))
 }
 
 func uInt64ToTraceID(high, low uint64) pcommon.TraceID {

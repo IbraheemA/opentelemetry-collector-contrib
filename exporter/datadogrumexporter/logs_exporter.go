@@ -10,25 +10,27 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/pdata/pcommon"
-	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
+	//"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogrumexporter/internal/clientutil"
+	//"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogrumexporter/internal/scrub"
 )
 
-type traceExporter struct {
+type logsExporter struct {
 	params exporter.Settings
 	cfg    *Config
 	ctx    context.Context // ctx triggers shutdown upon cancellation
 }
 
-func newTracesExporter(
+func newLogsExporter(
 	ctx context.Context,
 	params exporter.Settings,
 	cfg *Config,
-) (*traceExporter, error) {
-	exp := &traceExporter{
+) (*logsExporter, error) {
+	exp := &logsExporter{
 		params: params,
 		cfg:    cfg,
 		ctx:    ctx,
@@ -36,11 +38,11 @@ func newTracesExporter(
 	return exp, nil
 }
 
-var _ consumer.ConsumeTracesFunc = (*traceExporter)(nil).consumeTraces
+var _ consumer.ConsumeLogsFunc = (*logsExporter)(nil).consumeLogs
 
-func (exp *traceExporter) consumeTraces(
+func (exp *logsExporter) consumeLogs(
 	ctx context.Context,
-	td ptrace.Traces,
+	td plog.Logs,
 ) (err error) {
 	//defer func() { err = exp.scrubber.Scrub(err) }()
 	//header := make(http.Header)
@@ -58,10 +60,10 @@ func (exp *traceExporter) consumeTraces(
 	//	exp.params.Logger.Debug(string(result))
 	//}
 	//return nil
-	rspans := td.ResourceSpans()
-	exp.params.Logger.Debug("&&&&&&&&&& RECEIVED SPAN: ")
-	for i := range rspans.Len() {
-		rspan := rspans.At(i)
+	rlogs := td.ResourceLogs()
+	exp.params.Logger.Debug("&&&&&&&&&& RECEIVED LOGS: ")
+	for i := range rlogs.Len() {
+		rlog := rlogs.At(i)
 		//s, _ := json.MarshalIndent(rspan.Resource().Attributes().AsRaw(), "", "\t")
 		//s := rspan.ScopeSpans().At(0).Spans().At(0).Status().Code().String()
 		//exp.params.Logger.Debug(string(s))
@@ -81,7 +83,7 @@ func (exp *traceExporter) consumeTraces(
 
 		var rawRumData pcommon.Value
 
-		rattr := rspan.Resource().Attributes()
+		rattr := rlog.Resource().Attributes()
 
 		rawRumData, _ = rattr.Get("request_body_dump")
 
@@ -152,6 +154,7 @@ func (exp *traceExporter) consumeTraces(
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 			return fmt.Errorf("received non-OK response: status: %s, body: %s", resp.Status, body)
 		}
+
 		fmt.Println("Response:", string(body))
 	}
 	return nil

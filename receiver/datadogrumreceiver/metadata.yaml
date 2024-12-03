@@ -3,8 +3,7 @@ type: datadogrum
 status:
   class: receiver
   stability:
-    alpha: [traces]
-    development: [metrics]
+    development: [logs, traces, metrics]
   distributions: [contrib]
   codeowners:
     active: [IbraheemA]

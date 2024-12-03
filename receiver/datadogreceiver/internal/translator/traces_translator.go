@@ -91,8 +91,6 @@ func ToTraces(payload *pb.TracerPayload, req *http.Request) ptrace.Traces {
 
 	for _, trace := range traces {
 		for _, span := range trace {
-			fmt.Println("$$$$$$$$$$ translating span: ", span.SpanID)
-			fmt.Println("$$$$$$$$$$     with traceID: ", span.TraceID)
 			slice, exist := groupByService[span.Service]
 			if !exist {
 				slice = ptrace.NewSpanSlice()

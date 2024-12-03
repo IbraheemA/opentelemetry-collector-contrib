@@ -21,8 +21,8 @@ func NewFactory() receiver.Factory {
 	return receiver.NewFactory(
 		metadata.Type,
 		createDefaultConfig,
-		receiver.WithTraces(createTracesReceiver, metadata.TracesStability))
-
+		receiver.WithTraces(createTracesReceiver, metadata.TracesStability),
+		receiver.WithLogs(createLogsReceiver, metadata.LogsStability))
 }
 
 func createDefaultConfig() component.Config {
@@ -46,6 +46,21 @@ func createTracesReceiver(_ context.Context, params receiver.Settings, cfg compo
 	}
 
 	r.Unwrap().(*datadogRUMReceiver).nextTracesConsumer = consumer
+	return r, nil
+}
+
+func createLogsReceiver(_ context.Context, params receiver.Settings, cfg component.Config, consumer consumer.Logs) (receiver.Logs, error) {
+	var err error
+	rcfg := cfg.(*Config)
+	r := receivers.GetOrAdd(rcfg, func() (dd component.Component) {
+		dd, err = newDataDogRUMReceiver(rcfg, params)
+		return dd
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	r.Unwrap().(*datadogRUMReceiver).nextLogsConsumer = consumer
 	return r, nil
 }
 

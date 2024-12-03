@@ -6,12 +6,9 @@ package datadogrumexporter // import "github.com/open-telemetry/opentelemetry-co
 import (
 	"context"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogrumexporter/internal/metadata"
-	"runtime"
 	"sync"
 	"time"
 
-	pb "github.com/DataDog/datadog-agent/pkg/proto/pbgo/trace"
-	"github.com/DataDog/datadog-agent/pkg/trace/writer"
 	"github.com/DataDog/opentelemetry-mapping-go/pkg/inframetadata"
 	"github.com/DataDog/opentelemetry-mapping-go/pkg/otlp/attributes"
 	"github.com/DataDog/opentelemetry-mapping-go/pkg/otlp/attributes/source"
@@ -23,7 +20,6 @@ import (
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 	"go.opentelemetry.io/collector/featuregate"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 const metadataReporterPeriod = 30 * time.Minute
@@ -59,7 +55,8 @@ func newFactoryWithRegistry(registry *featuregate.Registry) exporter.Factory {
 	return exporter.NewFactory(
 		metadata.Type,
 		f.createDefaultConfig,
-		exporter.WithTraces(f.createTracesExporter, metadata.TracesStability))
+		exporter.WithTraces(f.createTracesExporter, metadata.TracesStability),
+		exporter.WithLogs(f.createLogsExporter, metadata.LogsStability))
 }
 
 // NewFactory creates a Datadog exporter factory
@@ -88,37 +85,6 @@ func checkAndCastConfig(c component.Config, logger *zap.Logger) *Config {
 	}
 	//cfg.logWarnings(logger)
 	return cfg
-}
-
-func (f *factory) consumeStatsPayload(ctx context.Context, wg *sync.WaitGroup, statsIn <-chan []byte, statsWriter *writer.DatadogStatsWriter, tracerVersion string, agentVersion string, logger *zap.Logger) {
-	for i := 0; i < runtime.NumCPU(); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case msg := <-statsIn:
-					sp := &pb.StatsPayload{}
-
-					err := proto.Unmarshal(msg, sp)
-					if err != nil {
-						logger.Error("failed to unmarshal stats payload", zap.Error(err))
-						continue
-					}
-					for _, csp := range sp.Stats {
-						if csp.TracerVersion == "" {
-							csp.TracerVersion = tracerVersion
-						}
-					}
-					// The DD Connector doesn't set the agent version, so we'll set it here
-					sp.AgentVersion = agentVersion
-					statsWriter.Write(sp)
-				}
-			}
-		}()
-	}
 }
 
 // createTracesExporter creates a trace exporter based on this config.
@@ -153,6 +119,50 @@ func (f *factory) createTracesExporter(
 	pusher = tracex.consumeTraces
 
 	return exporterhelper.NewTracesExporter(
+		ctx,
+		set,
+		cfg,
+		pusher,
+		// explicitly disable since we rely on http.Client timeout logic.
+		//exporterhelper.WithTimeout(exporterhelper.TimeoutSettings{Timeout: 0 * time.Second}),
+		// We don't do retries on traces because of deduping concerns on APM Events.
+		exporterhelper.WithRetry(configretry.BackOffConfig{Enabled: false}),
+		exporterhelper.WithShutdown(stop),
+	)
+}
+
+// createLogsExporter creates a log exporter based on this config.
+func (f *factory) createLogsExporter(
+	ctx context.Context,
+	set exporter.Settings,
+	c component.Config,
+) (exporter.Logs, error) {
+	cfg := checkAndCastConfig(c, set.TelemetrySettings.Logger)
+
+	var (
+		pusher consumer.ConsumeLogsFunc
+		stop   component.ShutdownFunc
+		wg     sync.WaitGroup // waits for agent to exit
+	)
+
+	ctx, cancel := context.WithCancel(ctx)
+	// cancel() runs on shutdown
+
+	tracex, err2 := newLogsExporter(ctx, set, cfg)
+	if err2 != nil {
+		cancel()
+		wg.Wait() // then wait for shutdown
+		return nil, err2
+	}
+	//pusher = tracex.consumeTraces
+	stop = func(context.Context) error {
+		cancel() // first cancel context
+		return nil
+	}
+
+	pusher = tracex.consumeLogs
+
+	return exporterhelper.NewLogsExporter(
 		ctx,
 		set,
 		cfg,

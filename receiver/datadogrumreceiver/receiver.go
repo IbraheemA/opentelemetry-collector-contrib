@@ -28,6 +28,7 @@ type datadogRUMReceiver struct {
 	params  receiver.Settings
 
 	nextTracesConsumer consumer.Traces
+	nextLogsConsumer   consumer.Logs
 
 	server    *http.Server
 	lReceiver *receiverhelper.ObsReport
@@ -56,7 +57,7 @@ func (ddr *datadogRUMReceiver) Start(ctx context.Context, host component.Host) e
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if ddr.nextTracesConsumer != nil {
+	if ddr.nextTracesConsumer != nil || ddr.nextLogsConsumer != nil {
 		ddmux.HandleFunc("/api/v2/rum", ddr.handleEvent)
 	}
 
@@ -136,7 +137,12 @@ func (ddr *datadogRUMReceiver) handleEvent(w http.ResponseWriter, req *http.Requ
 
 	buf := GetBuffer()
 	defer PutBuffer(buf)
-	io.Copy(buf, req.Body)
+	_, err = io.Copy(buf, req.Body)
+	if err != nil {
+		http.Error(w, "Unable to unmarshal reqs", http.StatusBadRequest)
+		ddr.params.Logger.Error("Unable to unmarshal reqs", zap.Error(err))
+		return
+	}
 	reqBytes := buf.Bytes()
 
 	//printBuf := GetBuffer()
@@ -144,12 +150,12 @@ func (ddr *datadogRUMReceiver) handleEvent(w http.ResponseWriter, req *http.Requ
 	//io.Copy(printBuf, req.MultipartReader())
 	//printBytes := printBuf.Bytes()
 
-	traceID := req.Header.Get("X-Datadog-Trace-Id")
+	//traceID := req.Header.Get("X-Datadog-Trace-Id")
 	//spanID := req.Header.Get("X-Datadog-Span-Id")
 
 	// check errors
 	ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED REQUEST BODY: " + fmt.Sprintf("%v", buf.String()))
-	ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED TraceID: " + fmt.Sprintf("%v", traceID))
+	//ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED TraceID: " + fmt.Sprintf("%v", traceID))
 	//ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED SpanID: " + fmt.Sprintf("%v", spanID))
 
 	//postfixBytes := []byte(`{"kind": "receiver", "name": "datadogrum", "data_type": "logs"}`) // Convert the postfix string to a byte slice
@@ -182,8 +188,19 @@ func (ddr *datadogRUMReceiver) handleEvent(w http.ResponseWriter, req *http.Requ
 	//}
 
 	for _, event := range jsonEvents {
-		otelTraces := translator.ToTraces(event, req, reqBytes)
-		err = ddr.nextTracesConsumer.ConsumeTraces(obsCtx, otelTraces)
+		_, ok := event["_dd"].(map[string]any)["trace_id"].(string)
+		if !ok {
+			fmt.Println("failed to retrieve traceID from RUM event payload; treating as log instead")
+			otelLogs := translator.ToLogs(event, req, reqBytes)
+			if ddr.nextLogsConsumer != nil {
+				err = ddr.nextLogsConsumer.ConsumeLogs(obsCtx, otelLogs)
+			}
+		} else {
+			otelTraces := translator.ToTraces(event, req, reqBytes)
+			if ddr.nextTracesConsumer != nil {
+				err = ddr.nextTracesConsumer.ConsumeTraces(obsCtx, otelTraces)
+			}
+		}
 		if err != nil {
 			http.Error(w, "Log consumer errored out", http.StatusInternalServerError)
 			ddr.params.Logger.Error("Log consumer errored out", zap.Error(err))

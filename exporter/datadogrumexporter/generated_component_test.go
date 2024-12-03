@@ -36,6 +36,13 @@ func TestComponentLifecycle(t *testing.T) {
 	}{
 
 		{
+			name: "logs",
+			createFn: func(ctx context.Context, set exporter.Settings, cfg component.Config) (component.Component, error) {
+				return factory.CreateLogs(ctx, set, cfg)
+			},
+		},
+
+		{
 			name: "traces",
 			createFn: func(ctx context.Context, set exporter.Settings, cfg component.Config) (component.Component, error) {
 				return factory.CreateTraces(ctx, set, cfg)
@@ -91,6 +98,8 @@ func TestComponentLifecycle(t *testing.T) {
 					err = e.ConsumeTraces(context.Background(), traces)
 				}
 			})
+
+			require.NoError(t, err)
 
 			err = c.Shutdown(context.Background())
 			require.NoError(t, err)
