@@ -113,14 +113,6 @@ type RUMPayload struct {
 	Type string
 }
 
-func createKeyValuePairs(m map[string]string) string {
-	b := new(bytes.Buffer)
-	for key, value := range m {
-		fmt.Fprintf(b, "%s=\"%s\"\n", key, value)
-	}
-	return b.String()
-}
-
 func (ddr *datadogRUMReceiver) handleEvent(w http.ResponseWriter, req *http.Request) {
 	obsCtx := ddr.lReceiver.StartTracesOp(req.Context())
 	var err error
