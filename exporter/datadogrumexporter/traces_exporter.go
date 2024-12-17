@@ -59,7 +59,7 @@ func (exp *traceExporter) consumeTraces(
 	//}
 	//return nil
 	rspans := td.ResourceSpans()
-	exp.params.Logger.Debug("&&&&&&&&&& RECEIVED SPAN: ")
+	fmt.Printf("&&&&&&&&&& RECEIVED SPAN: ")
 	for i := range rspans.Len() {
 		rspan := rspans.At(i)
 		//s, _ := json.MarshalIndent(rspan.Resource().Attributes().AsRaw(), "", "\t")

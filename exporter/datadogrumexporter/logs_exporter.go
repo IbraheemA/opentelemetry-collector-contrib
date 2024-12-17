@@ -61,7 +61,7 @@ func (exp *logsExporter) consumeLogs(
 	//}
 	//return nil
 	rlogs := td.ResourceLogs()
-	exp.params.Logger.Debug("&&&&&&&&&& RECEIVED LOGS: ")
+	fmt.Printf("&&&&&&&&&& RECEIVED LOGS: ")
 	for i := range rlogs.Len() {
 		rlog := rlogs.At(i)
 		//s, _ := json.MarshalIndent(rspan.Resource().Attributes().AsRaw(), "", "\t")

@@ -146,7 +146,7 @@ func (ddr *datadogRUMReceiver) handleEvent(w http.ResponseWriter, req *http.Requ
 	//spanID := req.Header.Get("X-Datadog-Span-Id")
 
 	// check errors
-	ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED REQUEST BODY: " + fmt.Sprintf("%v", buf.String()))
+	fmt.Printf("&&&&&&&&&& RECEIVED REQUEST BODY: " + fmt.Sprintf("%v", buf.String()))
 	//ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED TraceID: " + fmt.Sprintf("%v", traceID))
 	//ddr.params.Logger.Debug("&&&&&&&&&& RECEIVED SpanID: " + fmt.Sprintf("%v", spanID))
 
