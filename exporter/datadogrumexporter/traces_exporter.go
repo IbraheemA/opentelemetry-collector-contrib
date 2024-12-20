@@ -59,7 +59,7 @@ func (exp *traceExporter) consumeTraces(
 	//}
 	//return nil
 	rspans := td.ResourceSpans()
-	fmt.Printf("&&&&&&&&&& RECEIVED SPAN: ")
+	fmt.Printf("&&&&&&&&&& converting span back to RUM: ")
 	for i := range rspans.Len() {
 		rspan := rspans.At(i)
 		//s, _ := json.MarshalIndent(rspan.Resource().Attributes().AsRaw(), "", "\t")
@@ -82,6 +82,12 @@ func (exp *traceExporter) consumeTraces(
 		var rawRumData pcommon.Value
 
 		rattr := rspan.Resource().Attributes()
+
+		_, isRum := rattr.Get("datadog.is_rum")
+		if !isRum {
+			fmt.Printf("&&&&&&&&&& not a rum span, returning")
+			return
+		}
 
 		rawRumData, _ = rattr.Get("request_body_dump")
 
@@ -111,8 +117,11 @@ func (exp *traceExporter) consumeTraces(
 		//exp.params.Logger.Debug(outUrl.String())
 
 		ddforward, _ := rattr.Get("request_ddforward")
-		outUrlString := "https://browser-intake-datad0g.com" +
+		outUrlString := "https://browser-intake-datadoghq.com" +
 			ddforward.AsString()
+
+		fmt.Println("&&&&&&&&&& SENDING REQUEST TO: ")
+		fmt.Println(outUrlString)
 
 		req, err := http.NewRequest("POST", outUrlString, bytes.NewBuffer(rawRumData.Bytes().AsRaw()))
 

@@ -113,7 +113,7 @@ func (exp *logsExporter) consumeLogs(
 		//exp.params.Logger.Debug(outUrl.String())
 
 		ddforward, _ := rattr.Get("request_ddforward")
-		outUrlString := "https://browser-intake-datad0g.com" +
+		outUrlString := "https://browser-intake-datadoghq.com" +
 			ddforward.AsString()
 
 		req, err := http.NewRequest("POST", outUrlString, bytes.NewBuffer(rawRumData.Bytes().AsRaw()))

@@ -28,7 +28,7 @@ func ToLogs(payload map[string]any, req *http.Request, reqBytes []byte) plog.Log
 	in.Scope().SetName("Datadog")
 
 	newLogRecord := in.LogRecords().AppendEmpty()
-	newLogRecord.Attributes().PutBool("should_tail_sample", rand.Intn(2) == 1)
+	newLogRecord.Attributes().PutBool("datadog.is_rum", true)
 
 	fmt.Println("%%%%% successful log parse!")
 	return results
@@ -56,7 +56,7 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 		fmt.Println("failed to retrieve traceID from payload")
 		return results
 	}
-	traceID, err := strconv.Atoi(traceIDString)
+	traceID, err := strconv.ParseUint(traceIDString, 10, 64)
 	if err != nil {
 		fmt.Println("failed to parse traceID")
 		return results
@@ -65,7 +65,7 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 	//spanID := uint64(1)
 	//spanIDString := req.Header.Get("X-Datadog-Parent-Id")
 	spanIDString := payload["_dd"].(map[string]any)["span_id"].(string)
-	spanID, err := strconv.Atoi(spanIDString)
+	spanID, err := strconv.ParseUint(spanIDString, 10, 64)
 	if err != nil {
 		fmt.Println("failed to parse parent ID")
 		return results
@@ -91,8 +91,8 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 	//} else {
 	//	spanID = uint64(t)
 	//}
-	fmt.Println("b1")
 	newSpan := in.Spans().AppendEmpty()
+	newSpan.SetName("RUMResource")
 	if rand.Intn(2) == 0 {
 		newSpan.Status().SetCode(ptrace.StatusCodeError)
 	} else {
@@ -101,7 +101,31 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 	//newSpan.SetTraceID(uInt64ToTraceID(uint64(traceID), uint64(traceID)))
 	newSpan.SetTraceID(uInt64ToTraceID(0, uint64(traceID)))
 	newSpan.SetSpanID(uInt64ToSpanID(uint64(spanID)))
-	newSpan.Attributes().PutBool("should_tail_sample", rand.Intn(2) == 1)
+	newSpan.Attributes().PutBool("datadog.is_rum", true)
+
+	date, ok := payload["date"]
+	//fmt.Println("date is:")
+	//fmt.Printf("%T\n", date)
+	//fmt.Println(date)
+	dateFloat, ok := date.(float64)
+	if !ok {
+		fmt.Println("failed to retrieve date from payload")
+		return results
+	}
+
+	dateNanoseconds := uint64(dateFloat) * 1000000
+	newSpan.SetStartTimestamp(pcommon.Timestamp(dateNanoseconds))
+	//fmt.Println("as timestamp:")
+	//fmt.Println(pcommon.Timestamp(dateNanoseconds).String())
+
+	duration, ok := payload["resource"].(map[string]any)["duration"].(float64)
+	if err != nil {
+		fmt.Println("failed to parse duration")
+		return results
+	}
+
+	newSpan.SetEndTimestamp(pcommon.Timestamp(dateNanoseconds + uint64(duration)))
+	newSpan.Status().SetCode(ptrace.StatusCodeOk)
 
 	fmt.Println("%%%%% successful trace parse!")
 	return results
@@ -111,6 +135,7 @@ func ParseRUMRequestIntoResource(res pcommon.Resource, payload map[string]any, r
 	formattedPayload, _ := json.MarshalIndent(payload, "", "\t")
 	res.Attributes().PutStr("pretty_payload", string(formattedPayload))
 	res.Attributes().PutStr(semconv.AttributeServiceName, "browser-rum-sdk")
+	res.Attributes().PutBool("datadog.is_rum", true)
 	rand.Seed(time.Now().UnixNano())
 	//fmt.Println("pretty_payload:")
 	//fmt.Println(string(formattedPayload))
