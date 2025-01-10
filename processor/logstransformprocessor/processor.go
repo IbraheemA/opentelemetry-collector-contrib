@@ -12,7 +12,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/extension/experimental/storage"
+	"go.opentelemetry.io/collector/extension/xextension/storage"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.uber.org/zap"
 
@@ -79,7 +79,6 @@ func (ltp *logsTransformProcessor) Shutdown(ctx context.Context) error {
 }
 
 func (ltp *logsTransformProcessor) Start(ctx context.Context, _ component.Host) error {
-
 	wkrCount := int(math.Max(1, float64(runtime.NumCPU())))
 	ltp.fromConverter = adapter.NewFromPdataConverter(ltp.set, wkrCount)
 

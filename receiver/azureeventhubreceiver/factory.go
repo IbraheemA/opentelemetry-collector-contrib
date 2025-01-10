@@ -16,9 +16,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azureeventhubreceiver/internal/metadata"
 )
 
-var (
-	errUnexpectedConfigurationType = errors.New("failed to cast configuration to azure event hub config")
-)
+var errUnexpectedConfigurationType = errors.New("failed to cast configuration to azure event hub config")
 
 type eventhubReceiverFactory struct {
 	receivers *sharedcomponent.SharedComponents
@@ -112,21 +110,21 @@ func (f *eventhubReceiverFactory) getReceiver(
 			if logFormat(receiverConfig.Format) == rawLogFormat {
 				logsUnmarshaler = newRawLogsUnmarshaler(settings.Logger)
 			} else {
-				logsUnmarshaler = newAzureResourceLogsUnmarshaler(settings.BuildInfo, settings.Logger, receiverConfig.ApplySemanticConventions)
+				logsUnmarshaler = newAzureResourceLogsUnmarshaler(settings.BuildInfo, settings.Logger, receiverConfig.ApplySemanticConventions, receiverConfig.TimeFormats.Logs)
 			}
 		case pipeline.SignalMetrics:
 			if logFormat(receiverConfig.Format) == rawLogFormat {
 				metricsUnmarshaler = nil
 				err = errors.New("raw format not supported for Metrics")
 			} else {
-				metricsUnmarshaler = newAzureResourceMetricsUnmarshaler(settings.BuildInfo, settings.Logger)
+				metricsUnmarshaler = newAzureResourceMetricsUnmarshaler(settings.BuildInfo, settings.Logger, receiverConfig.TimeFormats.Metrics)
 			}
 		case pipeline.SignalTraces:
 			if logFormat(receiverConfig.Format) == rawLogFormat {
 				tracesUnmarshaler = nil
 				err = errors.New("raw format not supported for Traces")
 			} else {
-				tracesUnmarshaler = newAzureTracesUnmarshaler(settings.BuildInfo, settings.Logger)
+				tracesUnmarshaler = newAzureTracesUnmarshaler(settings.BuildInfo, settings.Logger, receiverConfig.TimeFormats.Traces)
 			}
 		}
 

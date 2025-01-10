@@ -19,8 +19,8 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
-	"go.opentelemetry.io/collector/extension/experimental/storage"
 	"go.opentelemetry.io/collector/extension/extensiontest"
+	"go.opentelemetry.io/collector/extension/xextension/storage"
 )
 
 func TestExtensionIntegrityWithSqlite(t *testing.T) {
@@ -85,7 +85,6 @@ func testExtensionIntegrity(t *testing.T, se storage.Extension) {
 
 		// Repeatedly thrash client
 		for j := 0; j < 100; j++ {
-
 			// Make sure my values are still mine
 			for i := 0; i < len(keys); i++ {
 				v, err := c.Get(ctx, keys[i])
