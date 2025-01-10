@@ -118,7 +118,7 @@ func (f *factory) createTracesExporter(
 
 	pusher = tracex.consumeTraces
 
-	return exporterhelper.NewTracesExporter(
+	return exporterhelper.NewTraces(
 		ctx,
 		set,
 		cfg,
@@ -162,7 +162,7 @@ func (f *factory) createLogsExporter(
 
 	pusher = tracex.consumeLogs
 
-	return exporterhelper.NewLogsExporter(
+	return exporterhelper.NewLogs(
 		ctx,
 		set,
 		cfg,

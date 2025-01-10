@@ -82,8 +82,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcompone
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.107.0/go.mod h1:nQ5D1f7vkNiXTP1mRyPEkM2y4OGeYQxOn0cPzb9Xh7w=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.107.0 h1:zTeRh4V3rMlXgNvfbDBnET6nvhOeZpYIbKTjVbSl9Ws=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.107.0/go.mod h1:/RtBag3LuHIkqN4bo8Erd3jCzA3gea70l9WyJ9TncXM=
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/datadogreceiver v0.107.0 h1:FLakYIPWiT8v+OsGqM+3JHEXT4LmklGCFzmhnCA+nL4=
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/datadogreceiver v0.107.0/go.mod h1:wG4IORPubq600fEFszpeCNjwpNRKmVD7V2t7V8OXNTM=
 github.com/philhofer/fwd v1.1.2 h1:bnDivRJ1EWPjUIRXV5KfORO897HTbpFAQddBdE8t7Gw=
 github.com/philhofer/fwd v1.1.2/go.mod h1:qkPdfjR2SIEbspLqpe1tO4n5yICnr2DY7mqEx2tUTP0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
@@ -120,8 +118,6 @@ go.opentelemetry.io/collector/client v1.13.0 h1:I0GzZPcOG+F6BY46SgsdcpCN+L0xPfjz
 go.opentelemetry.io/collector/client v1.13.0/go.mod h1:GOE/UvRdklwPCqYLRUOSiU/syl1BGQWa48ex7OGOq9Y=
 go.opentelemetry.io/collector/component v0.107.0 h1:3ReaEAtKwrPj7HrlKjEGBDKbBaxdRMPC2mfZ9b6zjXE=
 go.opentelemetry.io/collector/component v0.107.0/go.mod h1:1xMIYKvpnP7laipjgEw7kq1ozG7ySLkA0Evhr2Bp8M4=
-go.opentelemetry.io/collector/component/componentstatus v0.107.0 h1:KUR2fp1irMjE9qtH9I//KPYYZNKwkJV13+13u23RXeY=
-go.opentelemetry.io/collector/component/componentstatus v0.107.0/go.mod h1:cZ7+OgN8w1mxJJeTo5TrGOQz8RrsypfTMav0EkeZN9I=
 go.opentelemetry.io/collector/config/configauth v0.107.0 h1:2rAoMJjSfdP+ao5i7Ku68QYW5p0jjZ9y6a0nj3cIFp0=
 go.opentelemetry.io/collector/config/configauth v0.107.0/go.mod h1:IQx5BBZRoyPX9Qr3W4Ajy/4AnyJZb6jylI4rITrZMHQ=
 go.opentelemetry.io/collector/config/configcompression v1.13.0 h1:2LApl3qDZgjsVblY1Qu0gJaw9ZyYnZ6ZDUvid9rCZVg=

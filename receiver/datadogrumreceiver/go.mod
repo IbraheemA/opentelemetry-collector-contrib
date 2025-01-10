@@ -8,6 +8,7 @@ require (
 	github.com/DataDog/datadog-api-client-go/v2 v2.29.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/exp/metrics v0.107.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.107.0
+	github.com/rs/cors v1.11.0
 	github.com/stretchr/testify v1.9.0
 	github.com/vmihailenco/msgpack/v4 v4.3.13
 	go.opentelemetry.io/collector/component v0.107.0
@@ -57,7 +58,6 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/rs/cors v1.11.0 // indirect
 	github.com/tinylib/msgp v1.1.9 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
 	go.opentelemetry.io/collector v0.107.0 // indirect
