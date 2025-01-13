@@ -124,6 +124,8 @@ func ToTraces(payload map[string]any, req *http.Request, reqBytes []byte) ptrace
 		return results
 	}
 
+	rs.Resource().Attributes().PutInt("datadog.rum.duration", int64(duration))
+
 	newSpan.SetEndTimestamp(pcommon.Timestamp(dateNanoseconds + uint64(duration)))
 	newSpan.Status().SetCode(ptrace.StatusCodeOk)
 
